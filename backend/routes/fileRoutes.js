@@ -16,27 +16,31 @@ if (!fs.existsSync(STORAGE_DIR)) {
 }
 
 // POST /api/files/upload
-router.post('/upload', auth, upload.single('file'), async (req, res) => {
+router.post('/upload', auth, upload.array('files'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
     }
 
-    const { originalname, mimetype, size, path: tempPath } = req.file;
+    const { folderId } = req.body;
+    const uploadedFiles = [];
+
+    for (const file of req.files) {
+      const { originalname, mimetype, size, path: tempPath } = file;
 
     // Generate a secure random IV
     const iv = crypto.randomBytes(16);
     const ivHex = iv.toString('hex');
 
-    // Create a new file document with the IV
-    const newFile = new File({
-      originalName: originalname,
-      mimeType: mimetype,
-      size: size,
-      chunks: [],
-      iv: ivHex,
-      uploadedBy: req.user.id
-    });
+      const newFile = new File({
+        originalName: originalname,
+        mimeType: mimetype,
+        size: size,
+        chunks: [],
+        iv: ivHex,
+        uploadedBy: req.user.id,
+        folderId: folderId || null
+      });
     
     // Initial save to get the _id, this will now pass validation
     await newFile.save();
@@ -63,11 +67,13 @@ router.post('/upload', auth, upload.single('file'), async (req, res) => {
     // Remove the temporary uploaded file
     fs.unlinkSync(tempPath);
 
-    // Update the file document with the chunk info
-    newFile.chunks = [encryptedFileName];
-    await newFile.save();
+      // Update the file document with the chunk info
+      newFile.chunks = [encryptedFileName];
+      await newFile.save();
+      uploadedFiles.push(newFile);
+    }
 
-    res.status(201).json({ message: 'File uploaded successfully', file: newFile });
+    res.status(201).json({ message: 'Files uploaded successfully', files: uploadedFiles });
   } catch (error) {
     console.error('Upload Error:', error);
     res.status(500).json({ error: 'Failed to upload and process file' });
@@ -77,7 +83,28 @@ router.post('/upload', auth, upload.single('file'), async (req, res) => {
 // GET /api/files
 router.get('/', auth, async (req, res) => {
   try {
-    const files = await File.find({ uploadedBy: req.user.id }).sort({ uploadDate: -1 });
+    const { folderId, search, type, sort } = req.query;
+    
+    let query = { uploadedBy: req.user.id };
+    
+    if (folderId !== undefined) {
+      query.folderId = folderId === 'root' || folderId === '' ? null : folderId;
+    }
+
+    if (search) {
+      query.originalName = { $regex: search, $options: 'i' };
+    }
+
+    if (type) {
+      query.mimeType = { $regex: type, $options: 'i' };
+    }
+
+    let sortOption = { uploadDate: -1 };
+    if (sort === 'date_asc') sortOption = { uploadDate: 1 };
+    if (sort === 'size_desc') sortOption = { size: -1 };
+    if (sort === 'size_asc') sortOption = { size: 1 };
+
+    const files = await File.find(query).sort(sortOption);
     res.status(200).json(files);
   } catch (error) {
     console.error('Fetch Error:', error);
@@ -166,6 +193,27 @@ router.delete('/:id', auth, async (req, res) => {
   } catch (error) {
     console.error('Delete Error:', error);
     res.status(500).json({ error: 'Failed to delete file' });
+  }
+});
+
+// POST /api/files/:id/share
+router.post('/:id/share', auth, async (req, res) => {
+  try {
+    const file = await File.findOne({ _id: req.params.id, uploadedBy: req.user.id });
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    if (!file.isPublic) {
+      file.isPublic = true;
+      file.shareToken = crypto.randomBytes(16).toString('hex');
+      await file.save();
+    }
+
+    res.status(200).json({ shareToken: file.shareToken, isPublic: file.isPublic });
+  } catch (error) {
+    console.error('Share Error:', error);
+    res.status(500).json({ error: 'Failed to share file' });
   }
 });
 

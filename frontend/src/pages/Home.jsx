@@ -3,6 +3,7 @@ import { Cloud, Home as HomeIcon, Folder, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import UploadArea from '../components/UploadArea';
 import FileList from '../components/FileList';
+import Layout from '../components/Layout';
 import api from '../utils/api';
 
 const Home = () => {
@@ -36,63 +37,30 @@ const Home = () => {
   };
 
   return (
-    <div className="app-container">
-      {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="brand">
-          <Cloud size={28} />
-          <span>Aura Cloud</span>
-        </div>
-        <nav>
-          <ul className="nav-links">
-            <li>
-              <a className="nav-item active" onClick={() => navigate('/home')}>
-                <HomeIcon size={20} />
-                <span>Home</span>
-              </a>
-            </li>
-            <li>
-              <a className="nav-item" onClick={() => navigate('/files')}>
-                <Folder size={20} />
-                <span>Files</span>
-              </a>
-            </li>
-            <li style={{ marginTop: 'auto' }}>
-              <a className="nav-item" onClick={handleLogout} style={{ color: '#ef4444' }}>
-                <LogOut size={20} />
-                <span>Logout</span>
-              </a>
-            </li>
-          </ul>
-        </nav>
-      </aside>
+    <Layout>
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Dashboard</h1>
+        <p className="text-gray-500 dark:text-gray-400">Welcome to your secure digital archive</p>
+      </header>
 
-      {/* Main Content */}
-      <main className="main-content">
-        <header>
-          <h1 className="title-lg">Dashboard</h1>
-          <p className="subtitle">Welcome to your secure digital archive</p>
-        </header>
+      <section>
+        <UploadArea onUploadSuccess={fetchRecentFiles} />
+      </section>
 
-        <section>
-          <UploadArea onUploadSuccess={fetchRecentFiles} />
-        </section>
-
-        <section>
-          <h2 className="title-lg" style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>
-            Recent Uploads
-          </h2>
-          
-          {error && <div className="notification error">{error}</div>}
-          
-          {loading ? (
-            <p className="subtitle">Loading...</p>
-          ) : (
-            <FileList files={files} onFileDeleted={fetchRecentFiles} />
-          )}
-        </section>
-      </main>
-    </div>
+      <section>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+          Recent Uploads
+        </h2>
+        
+        {error && <div className="p-4 mb-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg">{error}</div>}
+        
+        {loading ? (
+          <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+        ) : (
+          <FileList files={files} onFileDeleted={fetchRecentFiles} />
+        )}
+      </section>
+    </Layout>
   );
 };
 

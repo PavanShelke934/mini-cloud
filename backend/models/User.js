@@ -11,8 +11,13 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
+    // Optional because OAuth users won't have a password initially
   },
+  googleId: {
+    type: String,
+    sparse: true,
+    unique: true
+  }
 });
 
 // Pre-save hook to hash password
