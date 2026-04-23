@@ -1,77 +1,113 @@
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { UploadCloud } from 'lucide-react';
+import { UploadCloud, File, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import api from '../utils/api';
 
-const UploadArea = ({ onUploadSuccess }) => {
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [error, setError] = useState(null);
+const formatBytes = (bytes, decimals = 2) => {
+  if (!+bytes) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+};
+
+const UploadArea = ({ onUploadSuccess, currentFolderId = null }) => {
+  const [uploadingFiles, setUploadingFiles] = useState([]);
 
   const onDrop = useCallback(async (acceptedFiles) => {
     if (acceptedFiles.length === 0) return;
-    
-    const file = acceptedFiles[0]; // Upload one by one for now
-    const formData = new FormData();
-    formData.append('file', file);
 
-    setUploading(true);
-    setProgress(0);
-    setError(null);
+    const newUploads = acceptedFiles.map(file => ({
+      id: Math.random().toString(36).substr(2, 9),
+      file,
+      progress: 0,
+      status: 'uploading' // uploading, success, error
+    }));
 
-    try {
-      await api.post('/files/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setProgress(percentCompleted);
-        },
-      });
+    setUploadingFiles(prev => [...newUploads, ...prev]);
 
-      setUploading(false);
-      setProgress(100);
-      toast.success('File uploaded successfully!');
-      onUploadSuccess();
-      
-      // Reset progress after a delay
-      setTimeout(() => setProgress(0), 2000);
-    } catch (err) {
-      console.error('Upload failed:', err);
-      toast.error('Upload failed. Please try again.');
-      setError('Upload failed. Please try again.');
-      setUploading(false);
-      setProgress(0);
+    for (const uploadItem of newUploads) {
+      const formData = new FormData();
+      formData.append('files', uploadItem.file);
+      if (currentFolderId) {
+        formData.append('folderId', currentFolderId);
+      }
+
+      try {
+        await api.post('/files/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadingFiles(prev => prev.map(f => 
+              f.id === uploadItem.id ? { ...f, progress: percentCompleted } : f
+            ));
+          }
+        });
+
+        setUploadingFiles(prev => prev.map(f => 
+          f.id === uploadItem.id ? { ...f, status: 'success' } : f
+        ));
+        toast.success(`Uploaded ${uploadItem.file.name}`);
+        if (onUploadSuccess) onUploadSuccess();
+      } catch (error) {
+        setUploadingFiles(prev => prev.map(f => 
+          f.id === uploadItem.id ? { ...f, status: 'error' } : f
+        ));
+        toast.error(`Failed to upload ${uploadItem.file.name}`);
+      }
     }
-  }, [onUploadSuccess]);
+  }, [onUploadSuccess, currentFolderId]);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, multiple: true });
 
   return (
-    <div className="upload-container">
+    <div className="mb-8">
       <div 
         {...getRootProps()} 
-        className={`upload-zone ${isDragActive ? 'active' : ''}`}
+        className={`upload-zone flex flex-col items-center justify-center p-12 rounded-2xl border-2 border-dashed text-center cursor-pointer transition-all duration-300 ${
+          isDragActive 
+            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
+            : 'border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800'
+        }`}
       >
         <input {...getInputProps()} />
-        <UploadCloud className="upload-icon" />
-        <div>
-          <h3 className="title-lg" style={{ fontSize: '1.25rem', marginBottom: '0.25rem' }}>
-            Drop new assets
-          </h3>
-          <p className="subtitle">
-            {isDragActive ? "Drop the files here..." : "Tap to browse or drop files into your gallery"}
-          </p>
-        </div>
+        <UploadCloud size={48} className={`mb-4 ${isDragActive ? 'text-blue-500' : 'text-gray-400 dark:text-gray-500'}`} />
+        <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">
+          {isDragActive ? 'Drop files here' : 'Drag & drop files here'}
+        </h3>
+        <p className="text-gray-500 dark:text-gray-400">or click to browse from your computer</p>
       </div>
 
-      {error && <div className="notification error" style={{ marginTop: '1rem' }}>{error}</div>}
-
-      {uploading && (
-        <div className="progress-container">
-          <div className="progress-bar" style={{ width: `${progress}%` }}></div>
+      {uploadingFiles.length > 0 && (
+        <div className="mt-6 flex flex-col gap-3">
+          <h4 className="text-gray-800 dark:text-gray-200 font-medium">Transfers</h4>
+          {uploadingFiles.map(fileObj => (
+            <div key={fileObj.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-4 transition-colors duration-300">
+              <File size={24} className="text-gray-400 dark:text-gray-500" />
+              <div className="flex-1">
+                <div className="flex justify-between mb-1">
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate max-w-[200px]">
+                    {fileObj.file.name}
+                  </span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {fileObj.status === 'uploading' ? `${fileObj.progress}%` : fileObj.status === 'success' ? 'Complete' : 'Failed'}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-300 ${fileObj.status === 'error' ? 'bg-red-500' : 'bg-blue-600 dark:bg-blue-500'}`}
+                    style={{ width: `${fileObj.progress}%` }}
+                  ></div>
+                </div>
+              </div>
+              <div>
+                {fileObj.status === 'success' && <CheckCircle size={20} className="text-green-500" />}
+                {fileObj.status === 'error' && <AlertCircle size={20} className="text-red-500" />}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -29,6 +29,20 @@ const fileSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
+  },
+  isPublic: {
+    type: Boolean,
+    default: false
+  },
+  shareToken: {
+    type: String,
+    sparse: true,
+    unique: true
+  },
+  folderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Folder',
+    default: null
   }
 });
 

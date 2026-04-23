@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@500;600;700&display=swap');
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   /* Aura Cloud Colors */
   --bg-color: #faf9fe;
@@ -28,23 +32,21 @@
   --transition: all 0.2s ease-in-out;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-color: #0f1115;
-    --surface: #16181d;
-    --surface-container-low: #1c1f26;
-    --surface-container: #22262f;
-    --surface-container-high: #2a2f3a;
-    --surface-container-highest: #333947;
-    --surface-lowest: rgba(0, 0, 0, 0.7);
+.dark {
+  --bg-color: #0f1115;
+  --surface: #16181d;
+  --surface-container-low: #1c1f26;
+  --surface-container: #22262f;
+  --surface-container-high: #2a2f3a;
+  --surface-container-highest: #333947;
+  --surface-lowest: rgba(0, 0, 0, 0.7);
 
-    --primary: #3d89ff;
-    --primary-container: #005bc1;
-    --on-surface: #e4e6eb;
-    --on-surface-variant: #9ca3af;
-    --on-primary: #ffffff;
-    --outline-variant: #4b5563;
-  }
+  --primary: #3d89ff;
+  --primary-container: #005bc1;
+  --on-surface: #e4e6eb;
+  --on-surface-variant: #9ca3af;
+  --on-primary: #ffffff;
+  --outline-variant: #4b5563;
 }
 
 * {
