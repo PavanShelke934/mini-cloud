@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import { Home, Folder, Cloud } from 'lucide-react';
+import { motion } from 'framer-motion';
 import UploadArea from './UploadArea';
 import FileList from './FileList';
+import Analytics from './Analytics';
+import api from '../utils/api';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('files');
@@ -13,7 +15,7 @@ const Dashboard = () => {
   const fetchFiles = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:5000/api/files');
+      const response = await api.get('/files');
       setFiles(response.data);
       setError(null);
     } catch (err) {
@@ -62,28 +64,51 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <main className="main-content">
-        <header>
-          <h1 className="title-lg">The Atelier</h1>
-          <p className="subtitle">Your secure digital archive</p>
+        <header className="mb-6">
+          <h1 className="title-lg bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">
+            Aura Dashboard
+          </h1>
+          <p className="subtitle">Secure, fast, and elegant cloud storage.</p>
         </header>
 
-        <section>
-          <UploadArea onUploadSuccess={fetchFiles} />
-        </section>
+        {activeTab === 'home' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Analytics files={files} />
+            <section className="mt-8">
+              <UploadArea onUploadSuccess={fetchFiles} />
+            </section>
+          </motion.div>
+        )}
 
-        <section>
-          <h2 className="title-lg" style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>
-            Recent Curator Items
-          </h2>
-          
-          {error && <div className="notification error">{error}</div>}
-          
-          {loading ? (
-            <p className="subtitle">Loading your gallery...</p>
-          ) : (
-            <FileList files={files} />
-          )}
-        </section>
+        {activeTab === 'files' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <section className="mb-6">
+              <UploadArea onUploadSuccess={fetchFiles} />
+            </section>
+
+            <section>
+              {error && <div className="notification error">{error}</div>}
+              
+              {loading ? (
+                <div className="flex justify-center items-center py-20">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                </div>
+              ) : (
+                <FileList files={files} onFileDeleted={fetchFiles} />
+              )}
+            </section>
+          </motion.div>
+        )}
       </main>
     </div>
   );

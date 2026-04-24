@@ -283,3 +283,30 @@ h1, h2, h3, h4, h5, h6 {
   background-color: #f8d7da;
   color: #721c24;
 }
+
+/* Custom Premium Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface-container-highest);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--outline-variant);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--surface-container-high);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--outline-variant);
+}

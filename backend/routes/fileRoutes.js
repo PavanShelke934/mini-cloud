@@ -22,15 +22,20 @@ router.post('/upload', auth, upload.array('files'), async (req, res) => {
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
-    const { folderId } = req.body;
+    const { folderId, isEncrypted } = req.body;
     const uploadedFiles = [];
+    const shouldEncrypt = isEncrypted === undefined || isEncrypted === 'true';
 
     for (const file of req.files) {
       const { originalname, mimetype, size, path: tempPath } = file;
 
-    // Generate a secure random IV
-    const iv = crypto.randomBytes(16);
-    const ivHex = iv.toString('hex');
+    let ivHex = undefined;
+    let iv = null;
+
+    if (shouldEncrypt) {
+      iv = crypto.randomBytes(16);
+      ivHex = iv.toString('hex');
+    }
 
       const newFile = new File({
         originalName: originalname,
@@ -38,6 +43,7 @@ router.post('/upload', auth, upload.array('files'), async (req, res) => {
         size: size,
         chunks: [],
         iv: ivHex,
+        isEncrypted: shouldEncrypt,
         uploadedBy: req.user.id,
         folderId: folderId || null
       });
@@ -46,29 +52,32 @@ router.post('/upload', auth, upload.array('files'), async (req, res) => {
     await newFile.save();
 
     const fileId = newFile._id.toString();
-    const encryptedFileName = `${fileId}_encrypted`;
-    const encryptedFilePath = path.join(STORAGE_DIR, encryptedFileName);
+    const storedFileName = `${fileId}_data`;
+    const storedFilePath = path.join(STORAGE_DIR, storedFileName);
 
-    // Stream encryption
+    // Stream encryption or copy
     const readStream = fs.createReadStream(tempPath);
-    const writeStream = fs.createWriteStream(encryptedFilePath);
+    const writeStream = fs.createWriteStream(storedFilePath);
     
-    const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
-    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-
     await new Promise((resolve, reject) => {
-      readStream.pipe(cipher).pipe(writeStream);
+      if (shouldEncrypt) {
+        const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
+        const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+        readStream.pipe(cipher).pipe(writeStream);
+        cipher.on('error', reject);
+      } else {
+        readStream.pipe(writeStream);
+      }
       writeStream.on('finish', resolve);
       writeStream.on('error', reject);
       readStream.on('error', reject);
-      cipher.on('error', reject);
     });
 
     // Remove the temporary uploaded file
     fs.unlinkSync(tempPath);
 
       // Update the file document with the chunk info
-      newFile.chunks = [encryptedFileName];
+      newFile.chunks = [storedFileName];
       await newFile.save();
       uploadedFiles.push(newFile);
     }
@@ -144,21 +153,26 @@ router.get('/download/:id', auth, async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${file.originalName}"`);
     res.setHeader('Content-Type', file.mimeType);
 
-    // Stream decryption
+    // Stream decryption or copy
     const readStream = fs.createReadStream(chunkPath);
-    const iv = Buffer.from(file.iv, 'hex');
-    const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+    
+    if (file.isEncrypted !== false) {
+      const iv = Buffer.from(file.iv, 'hex');
+      const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
+      const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
 
-    readStream.pipe(decipher).pipe(res);
+      readStream.pipe(decipher).pipe(res);
+
+      decipher.on('error', (error) => {
+        console.error('Decipher Error:', error);
+        if (!res.headersSent) res.status(500).end();
+      });
+    } else {
+      readStream.pipe(res);
+    }
 
     readStream.on('error', (error) => {
       console.error('Read Stream Error:', error);
-      if (!res.headersSent) res.status(500).end();
-    });
-
-    decipher.on('error', (error) => {
-      console.error('Decipher Error:', error);
       if (!res.headersSent) res.status(500).end();
     });
 

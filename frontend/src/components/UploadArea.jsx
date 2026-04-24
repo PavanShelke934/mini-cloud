@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { UploadCloud, File, CheckCircle, AlertCircle } from 'lucide-react';
+import { UploadCloud, File, CheckCircle, AlertCircle, Lock, Unlock } from 'lucide-react';
 import { toast } from 'react-toastify';
 import api from '../utils/api';
 
@@ -15,6 +15,7 @@ const formatBytes = (bytes, decimals = 2) => {
 
 const UploadArea = ({ onUploadSuccess, currentFolderId = null }) => {
   const [uploadingFiles, setUploadingFiles] = useState([]);
+  const [isEncrypted, setIsEncrypted] = useState(true);
 
   const onDrop = useCallback(async (acceptedFiles) => {
     if (acceptedFiles.length === 0) return;
@@ -34,6 +35,7 @@ const UploadArea = ({ onUploadSuccess, currentFolderId = null }) => {
       if (currentFolderId) {
         formData.append('folderId', currentFolderId);
       }
+      formData.append('isEncrypted', isEncrypted);
 
       try {
         await api.post('/files/upload', formData, {
@@ -58,7 +60,7 @@ const UploadArea = ({ onUploadSuccess, currentFolderId = null }) => {
         toast.error(`Failed to upload ${uploadItem.file.name}`);
       }
     }
-  }, [onUploadSuccess, currentFolderId]);
+  }, [onUploadSuccess, currentFolderId, isEncrypted]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, multiple: true });
 
@@ -77,7 +79,24 @@ const UploadArea = ({ onUploadSuccess, currentFolderId = null }) => {
         <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">
           {isDragActive ? 'Drop files here' : 'Drag & drop files here'}
         </h3>
-        <p className="text-gray-500 dark:text-gray-400">or click to browse from your computer</p>
+        <p className="text-gray-500 dark:text-gray-400 mb-6">or click to browse from your computer</p>
+        
+        {/* Encryption Toggle inside upload area to keep it localized */}
+        <div 
+          className="mt-4 flex items-center gap-3 bg-white/50 dark:bg-gray-900/50 p-2 rounded-xl backdrop-blur-sm border border-gray-200 dark:border-gray-700"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button 
+            onClick={() => setIsEncrypted(!isEncrypted)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${isEncrypted ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isEncrypted ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+          <div className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {isEncrypted ? <Lock size={16} className="text-blue-600 dark:text-blue-400" /> : <Unlock size={16} className="text-gray-500" />}
+            <span>Encrypt before upload</span>
+          </div>
+        </div>
       </div>
 
       {uploadingFiles.length > 0 && (

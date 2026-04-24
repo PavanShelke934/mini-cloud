@@ -23,7 +23,11 @@ const fileSchema = new mongoose.Schema({
   }],
   iv: {
     type: String,
-    required: true
+    required: false
+  },
+  isEncrypted: {
+    type: Boolean,
+    default: true
   },
   uploadedBy: {
     type: mongoose.Schema.Types.ObjectId,
